@@ -30,6 +30,10 @@ border: 1px solid #ccc;
 display: inline-block;
 max-width: 90%;
 }
+#queryDisplay a {
+text-decoration: none;
+color: #000;
+}
 #counter {
 margin-top: 2rem;
 font-size: 2rem;
@@ -523,9 +527,6 @@ const queries = [...new Set([
 
 
       // ... (add all others from previous replies)
-])];
-
-
 let copiedCount = 0;
 const usedQueries = new Set();
 
@@ -546,7 +547,14 @@ query = queries[Math.floor(Math.random() * queries.length)];
 usedQueries.add(query);
 
 
-document.getElementById("queryDisplay").textContent = query;
+const encodedQuery = encodeURIComponent(query);
+const searchUrl = `https://www.bing.com/search?q=${encodedQuery}`;
+
+
+const link = `<a href="${searchUrl}" target="_blank">${query}</a>`;
+document.getElementById("queryDisplay").innerHTML = link;
+
+
 navigator.clipboard.writeText(query).then(() => {
 copiedCount++;
 updateCounter();
@@ -560,3 +568,4 @@ document.getElementById("counter").textContent = `${copiedCount} copied`;
 </script>
 </body>
 </html>
+
