@@ -525,6 +525,7 @@ const queries = [...new Set([
 "Can wind flow in circles endlessly"
 ])];
 
+
 let copiedCount = 0;
 const usedQueries = new Set();
 
@@ -546,7 +547,7 @@ usedQueries.add(query);
 
 
 const encodedQuery = encodeURIComponent(query);
-const searchUrl = `https://www.bing.com/search?q=${encodedQuery}`;
+const searchUrl = `https://www.bing.com/search?q=${encodedQuery}&form=ANSPH1`;
 
 
 const link = `<a href="${searchUrl}" target="_blank">${query}</a>`;
@@ -566,5 +567,6 @@ document.getElementById("counter").textContent = `${copiedCount} copied`;
 </script>
 </body>
 </html>
+
 
 
