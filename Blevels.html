@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Level Aggregator</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            width: 90%;
+            max-width: 800px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            background-color: #1e1e1e;
+            color: #00ff88;
+            border: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #3700b3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        button:hover { background-color: #6200ee; }
+        .copy-btn { background-color: #03dac6; color: #000; }
+        .copy-btn:hover { background-color: #018786; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #1e1e1e;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 12px;
+            text-align: left;
+        }
+        th { background-color: #2c2c2c; color: #bb86fc; }
+        tr:nth-child(even) { background-color: #252525; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Level Aggregator</h2>
+    <textarea id="inputData" placeholder="Paste raw data here..."></textarea>
+    <br>
+    <button onclick="processData()">Calculate Levels</button>
+    <button class="copy-btn" onclick="copyToClipboard()">Copy for Google Sheets</button>
+
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>Level Label</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+    </table>
+</div>
+
+<script>
+function processData() {
+    const input = document.getElementById('inputData').value;
+    const lines = input.split('\n');
+    let data = [];
+
+    lines.forEach(line => {
+        const match = line.match(/^([\w\s]+)[:\s\t]+([\d.]+)$/);
+        if (match) {
+            data.append({ key: match[1].trim(), val: parseFloat(match[2]) });
+        }
+    });
+
+    if (data.length === 0) return;
+
+    // Sort Descending
+    data.sort((a, b) => b.val - a.val);
+
+    // Grouping Logic (3 point range)
+    let groups = [];
+    let currentGroup = [data[0]];
+
+    for (let i = 1; i < data.length; i++) {
+        let groupVals = currentGroup.map(item => item.val);
+        let minVal = Math.min(...groupVals, data[i].val);
+        let maxVal = Math.max(...groupVals, data[i].val);
+
+        if (maxVal - minVal <= 3) {
+            currentGroup.push(data[i]);
+        } else {
+            groups.push(currentGroup);
+            currentGroup = [data[i]];
+        }
+    }
+    groups.push(currentGroup);
+
+    const resultBody = document.getElementById('resultBody');
+    resultBody.innerHTML = '';
+
+    groups.forEach(group => {
+        let keys = group.map(g => g.key);
+        let vals = group.map(g => g.val);
+        
+        // Special Merger Logic: PDL/yNL and PDH/yNH
+        let finalKeys = [];
+        let hasPDL = keys.includes('PDL');
+        let hasYNL = keys.includes('yNL');
+        let hasPDH = keys.includes('PDH');
+        let hasYNH = keys.includes('yNH');
+
+        let processedKeys = [...keys];
+        if (hasPDL && hasYNL) {
+            processedKeys = processedKeys.filter(k => k !== 'PDL' && k !== 'yNL');
+            processedKeys.push('PDNL');
+        }
+        if (hasPDH && hasYNH) {
+            processedKeys = processedKeys.filter(k => k !== 'PDH' && k !== 'yNH');
+            processedKeys.push('PDNH');
+        }
+
+        // Bias Logic
+        let hCount = processedKeys.filter(k => k.endsWith('H')).length;
+        let lCount = processedKeys.filter(k => k.endsWith('L')).length;
+        
+        let selectedVal;
+        if (lCount > hCount) {
+            selectedVal = Math.min(...vals);
+        } else if (hCount > lCount) {
+            selectedVal = Math.max(...vals);
+        } else {
+            selectedVal = vals[0]; // First (highest in our sorted list)
+        }
+
+        const row = `<tr><td>${processedKeys.join(' / ')}</td><td>${selectedVal.toFixed(2)}</td></tr>`;
+        resultBody.innerHTML += row;
+    });
+}
+
+function copyToClipboard() {
+    const table = document.getElementById('resultTable');
+    let tsv = "";
+    for (let row of table.rows) {
+        let rowData = [];
+        for (let cell of row.cells) {
+            rowData.push(cell.innerText);
+        }
+        tsv += rowData.join("\t") + "\n";
+    }
+    
+    navigator.clipboard.writeText(tsv).then(() => {
+        alert("Copied to clipboard! You can now paste into Google Sheets.");
+    });
+}
+</script>
+
+</body>
+</html>
