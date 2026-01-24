@@ -2,35 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Level Aggregator</title>
+    <title>Blevels</title>
     <style>
-        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { width: 95%; max-width: 800px; }
-        textarea { width: 100%; height: 180px; background-color: #1e1e1e; color: #00ff88; border: 1px solid #444; padding: 10px; font-family: monospace; border-radius: 4px; }
-        .controls { margin: 15px 0; }
-        button { background-color: #3700b3; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 10px; transition: 0.2s; }
-        button:hover { background-color: #6200ee; }
+        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; }
+        
+        /* Slimmer fixed width to keep Price close to Level */
+        .container { width: 400px; text-align: left; }
+        
+        h2 { color: #bb86fc; margin-bottom: 10px; margin-top: 0; }
+        textarea { width: 100%; height: 120px; background-color: #1e1e1e; color: #00ff88; border: 1px solid #444; padding: 10px; font-family: monospace; border-radius: 4px; box-sizing: border-box; resize: vertical; }
+        #platformOutput { height: 115px; color: #03dac6; margin-top: 8px; font-size: 0.8em; }
+        
+        /* Two-row button layout */
+        .controls { margin: 15px 0; display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .button-row { display: flex; gap: 8px; width: 100%; }
+        button { flex: 1; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em; transition: 0.2s; }
+        
+        .calc-btn { background-color: #3700b3; color: white; }
+        .calc-btn:hover { background-color: #6200ee; }
+        .clear-btn { background-color: #444; color: #fff; }
+        .clear-btn:hover { background-color: #666; }
         .copy-btn { background-color: #03dac6; color: #000; }
         .copy-btn:hover { background-color: #018786; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #1e1e1e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        th, td { border: 1px solid #333; padding: 12px; text-align: left; }
-        th { background-color: #2c2c2c; color: #bb86fc; text-transform: uppercase; font-size: 0.8em; letter-spacing: 1px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: #1e1e1e; }
+        th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; font-size: 0.85em; }
+        th { background-color: #2c2c2c; color: #bb86fc; text-transform: uppercase; font-size: 0.7em; letter-spacing: 1px; }
         tr:nth-child(even) { background-color: #252525; }
+        label { font-size: 0.75em; color: #aaa; margin-bottom: 4px; display: block; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Level Aggregator</h2>
-    <textarea id="inputData" placeholder="Paste data here (e.g. GX H 25246.5 or PDO: 25471)..."></textarea>
+    <h2>Blevels</h2>
+    
+    <label>Input Raw Data:</label>
+    <textarea id="inputData" placeholder="Paste data here..."></textarea>
+    
+    <label style="margin-top:12px;">Platform Output:</label>
+    <textarea id="platformOutput" readonly placeholder="Calculated string..."></textarea>
+
     <div class="controls">
-        <button onclick="processData()">Calculate Levels</button>
-        <button class="copy-btn" onclick="copyToClipboard()">Copy for Sheets</button>
+        <div class="button-row">
+            <button class="calc-btn" onclick="processData()">Calculate Levels</button>
+            <button class="clear-btn" onclick="clearAll()">Clear</button>
+        </div>
+        <div class="button-row">
+            <button class="copy-btn" onclick="copyPlatformOutput()">Copy Platform</button>
+            <button class="copy-btn" onclick="copyToSheets()">Copy Sheets</button>
+        </div>
     </div>
 
     <table id="resultTable">
         <thead>
-            <tr><th>Level Label</th><th>Price</th></tr>
+            <tr><th>Level</th><th>Price</th></tr>
         </thead>
         <tbody id="resultBody"></tbody>
     </table>
@@ -43,7 +69,6 @@ function processData() {
     let data = [];
 
     lines.forEach(line => {
-        // Matches "Key Value" or "Key: Value"
         const match = line.trim().match(/^(.*?)(?:\s+|:)\s*([\d.]+)$/);
         if (match) {
             data.push({ key: match[1].trim(), val: parseFloat(match[2]) });
@@ -54,30 +79,26 @@ function processData() {
     data.sort((a, b) => b.val - a.val);
 
     let groups = [];
-    let currentGroup = [data[0]];
-
-    for (let i = 1; i < data.length; i++) {
-        let groupVals = currentGroup.map(item => item.val);
-        let minVal = Math.min(...groupVals, data[i].val);
-        let maxVal = Math.max(...groupVals, data[i].val);
-
-        if (maxVal - minVal <= 3) {
-            currentGroup.push(data[i]);
-        } else {
-            groups.push(currentGroup);
-            currentGroup = [data[i]];
+    if (data.length > 0) {
+        let currentGroup = [data[0]];
+        for (let i = 1; i < data.length; i++) {
+            let groupVals = currentGroup.map(item => item.val);
+            let minVal = Math.min(...groupVals, data[i].val);
+            let maxVal = Math.max(...groupVals, data[i].val);
+            if (maxVal - minVal <= 3) {
+                currentGroup.push(data[i]);
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [data[i]];
+            }
         }
+        groups.push(currentGroup);
     }
-    groups.push(currentGroup);
 
-    const resultBody = document.getElementById('resultBody');
-    resultBody.innerHTML = '';
-
-    groups.forEach(group => {
+    const processedResults = groups.map(group => {
         let keys = group.map(g => g.key);
         let vals = group.map(g => g.val);
         
-        // Merger Logic
         let processedKeys = [...keys];
         if (keys.includes('PDL') && keys.includes('yNL')) {
             processedKeys = processedKeys.filter(k => k !== 'PDL' && k !== 'yNL');
@@ -88,25 +109,43 @@ function processData() {
             processedKeys.push('PDNH');
         }
 
-        // Bias Rule
         let hCount = processedKeys.filter(k => k.endsWith('H')).length;
         let lCount = processedKeys.filter(k => k.endsWith('L')).length;
         
         let selectedVal = (lCount > hCount) ? Math.min(...vals) : (hCount > lCount) ? Math.max(...vals) : vals[0];
-
-        const row = `<tr><td>${processedKeys.join(' / ')}</td><td>${selectedVal.toFixed(2)}</td></tr>`;
-        resultBody.innerHTML += row;
+        return { label: processedKeys.join(' / '), price: selectedVal.toFixed(2) };
     });
+
+    const resultBody = document.getElementById('resultBody');
+    resultBody.innerHTML = '';
+    processedResults.forEach(res => {
+        resultBody.innerHTML += `<tr><td>${res.label}</td><td>${res.price}</td></tr>`;
+    });
+
+    const platformString = processedResults.map(res => `${res.label}, ${res.price}`).join('\\n');
+    document.getElementById('platformOutput').value = `"${platformString}"`;
 }
 
-function copyToClipboard() {
+function copyPlatformOutput() {
+    const text = document.getElementById('platformOutput').value;
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+}
+
+function copyToSheets() {
     const rows = Array.from(document.querySelectorAll('#resultBody tr'));
+    if (rows.length === 0) return;
     const tsv = rows.map(row => {
         const cells = Array.from(row.querySelectorAll('td'));
         return cells.map(c => c.innerText).join('\t');
     }).join('\n');
-    
-    navigator.clipboard.writeText(tsv).then(() => alert("Copied! Paste directly into Google Sheets."));
+    navigator.clipboard.writeText(tsv);
+}
+
+function clearAll() {
+    document.getElementById('inputData').value = '';
+    document.getElementById('platformOutput').value = '';
+    document.getElementById('resultBody').innerHTML = '';
 }
 </script>
 </body>
