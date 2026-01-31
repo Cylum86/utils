@@ -173,6 +173,18 @@
         .btn-secondary:hover {
             background: var(--bg-primary);
             border-color: var(--accent);
+            box-shadow: none;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         /* Left Column - Video Player */
@@ -235,6 +247,8 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
         }
 
         .section-title {
@@ -243,6 +257,12 @@
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.08em;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
         }
 
         .transcript-textarea {
@@ -277,6 +297,11 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+
+        /* Hidden file input */
+        .file-input-hidden {
+            display: none;
         }
 
         /* Right Column - Search Results */
@@ -548,6 +573,14 @@
             color: var(--success);
         }
 
+        .toast.error {
+            border-color: #f87171;
+        }
+
+        .toast.error .toast-icon {
+            color: #f87171;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .container {
@@ -566,6 +599,11 @@
 
             .shortcuts-hint {
                 display: none;
+            }
+
+            .section-actions {
+                width: 100%;
+                justify-content: flex-end;
             }
         }
 
@@ -625,12 +663,50 @@
             font-size: 0.8rem;
             cursor: pointer;
             transition: all 0.2s ease;
+            font-family: 'Sora', sans-serif;
+        }
+
+        .view-btn:hover {
+            border-color: var(--accent);
         }
 
         .view-btn.active {
             background: var(--accent);
             border-color: var(--accent);
             color: white;
+        }
+
+        /* Transcript status indicator */
+        .transcript-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-dot.loaded {
+            background: var(--success);
+        }
+
+        .status-dot.loading {
+            background: var(--accent);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
     </style>
 </head>
@@ -686,13 +762,38 @@
             <!-- Transcript Input -->
             <div class="transcript-input-section">
                 <div class="section-header">
-                    <span class="section-title">Paste Transcript</span>
-                    <button class="btn btn-secondary" id="parseBtn" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
-                        Parse Transcript
-                    </button>
+                    <span class="section-title">Transcript Source</span>
+                    <div class="section-actions">
+                        <input type="file" id="fileInput" class="file-input-hidden" accept=".txt,.srt,.vtt">
+                        <button class="btn btn-secondary btn-small" id="uploadBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Upload
+                        </button>
+                        <button class="btn btn-secondary btn-small" id="downloadBtn" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download
+                        </button>
+                        <button class="btn btn-small" id="parseBtn">
+                            Parse
+                        </button>
+                    </div>
                 </div>
+                
+                <div class="transcript-status" id="transcriptStatus">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">No transcript loaded</span>
+                </div>
+
                 <textarea class="transcript-textarea" id="transcriptInput" 
-                    placeholder="Paste your transcript here...
+                    placeholder="Paste your transcript here, or upload a .txt file...
 
 Supported formats:
 0:00 Hello and welcome to this video
@@ -740,7 +841,7 @@ OR
                         <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                     <h3>No transcript loaded</h3>
-                    <p>Paste a transcript with timestamps in the text area, then click "Parse Transcript"</p>
+                    <p>Paste a transcript with timestamps, upload a text file, or click "Parse" after loading</p>
                 </div>
 
                 <div class="full-transcript" id="fullTranscript"></div>
@@ -772,12 +873,17 @@ OR
         let selectedResultIndex = -1;
         let filteredResults = [];
         let timeUpdateInterval = null;
+        let currentVideoId = null;
+        let rawTranscriptText = '';
 
         // DOM Elements
         const videoUrlInput = document.getElementById('videoUrl');
         const loadVideoBtn = document.getElementById('loadVideoBtn');
         const transcriptInput = document.getElementById('transcriptInput');
         const parseBtn = document.getElementById('parseBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const fileInput = document.getElementById('fileInput');
         const searchInput = document.getElementById('searchInput');
         const searchStats = document.getElementById('searchStats');
         const resultsContainer = document.getElementById('resultsContainer');
@@ -786,6 +892,8 @@ OR
         const currentTimeDisplay = document.getElementById('currentTime');
         const playerPlaceholder = document.getElementById('playerPlaceholder');
         const viewBtns = document.querySelectorAll('.view-btn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
 
         // Extract video ID from URL
         function extractVideoId(url) {
@@ -803,6 +911,7 @@ OR
 
         // Initialize YouTube Player
         function initPlayer(videoId) {
+            currentVideoId = videoId;
             playerPlaceholder.style.display = 'none';
             
             if (player) {
@@ -935,6 +1044,17 @@ OR
             return parsed;
         }
 
+        // Update transcript status
+        function updateStatus(status, text) {
+            statusDot.className = 'status-dot';
+            if (status === 'loaded') {
+                statusDot.classList.add('loaded');
+            } else if (status === 'loading') {
+                statusDot.classList.add('loading');
+            }
+            statusText.textContent = text;
+        }
+
         // Render search results
         function renderResults(query = '') {
             if (currentView === 'full') {
@@ -1033,6 +1153,47 @@ OR
             }
         }
 
+        // Download transcript
+        function downloadTranscript() {
+            if (transcript.length === 0) {
+                showToast('No transcript to download', 'error');
+                return;
+            }
+
+            const content = transcript.map(item => `${item.timestamp} ${item.text}`).join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentVideoId ? `transcript-${currentVideoId}.txt` : 'transcript.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('Transcript downloaded!', 'success');
+        }
+
+        // Handle file upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                transcriptInput.value = e.target.result;
+                showToast(`Loaded: ${file.name}`, 'success');
+            };
+            reader.onerror = function() {
+                showToast('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+            
+            // Reset file input so same file can be uploaded again
+            event.target.value = '';
+        }
+
         // Escape regex special characters
         function escapeRegex(string) {
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1079,18 +1240,32 @@ OR
             
             if (transcript.length === 0) {
                 showToast('No valid timestamps found. Check the format.', 'error');
+                updateStatus('', 'No valid timestamps found');
                 return;
             }
             
+            rawTranscriptText = text;
             searchInput.disabled = false;
+            downloadBtn.disabled = false;
             searchInput.focus();
             renderResults();
+            updateStatus('loaded', `${transcript.length} lines loaded`);
             showToast(`Parsed ${transcript.length} transcript lines`, 'success');
         });
 
         searchInput.addEventListener('input', (e) => {
             renderResults(e.target.value);
         });
+
+        // Upload button triggers file input
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', handleFileUpload);
+
+        // Download button
+        downloadBtn.addEventListener('click', downloadTranscript);
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
