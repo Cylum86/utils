@@ -25,6 +25,42 @@
         .copy-btn { background-color: #03dac6; color: #000; }
         .copy-btn:hover { background-color: #018786; }
 
+        /* Threshold control styling */
+        .threshold-control { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .threshold-control label { 
+            font-size: 0.85em; 
+            color: #bb86fc; 
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        .threshold-control input { 
+            width: 70px; 
+            padding: 6px 8px; 
+            background-color: #2c2c2c; 
+            color: #00ff88; 
+            border: 1px solid #444; 
+            border-radius: 4px; 
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .threshold-control input:focus {
+            outline: none;
+            border-color: #bb86fc;
+        }
+        .threshold-hint {
+            font-size: 0.7em;
+            color: #666;
+        }
+
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: #1e1e1e; }
         th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; font-size: 0.85em; }
         th { background-color: #2c2c2c; color: #bb86fc; text-transform: uppercase; font-size: 0.7em; letter-spacing: 1px; }
@@ -54,6 +90,12 @@
         </div>
     </div>
 
+    <div class="threshold-control">
+        <label>Grouping Threshold:</label>
+        <input type="number" id="thresholdInput" value="3" min="0" step="0.5">
+        <span class="threshold-hint">points</span>
+    </div>
+
     <table id="resultTable">
         <thead>
             <tr><th>Level</th><th>Price</th></tr>
@@ -63,9 +105,15 @@
 </div>
 
 <script>
+function getThreshold() {
+    const val = parseFloat(document.getElementById('thresholdInput').value);
+    return isNaN(val) ? 3 : val;
+}
+
 function processData() {
     const input = document.getElementById('inputData').value;
     const lines = input.split('\n');
+    const threshold = getThreshold();
     let data = [];
 
     lines.forEach(line => {
@@ -85,7 +133,7 @@ function processData() {
             let groupVals = currentGroup.map(item => item.val);
             let minVal = Math.min(...groupVals, data[i].val);
             let maxVal = Math.max(...groupVals, data[i].val);
-            if (maxVal - minVal <= 3) {
+            if (maxVal - minVal <= threshold) {
                 currentGroup.push(data[i]);
             } else {
                 groups.push(currentGroup);
@@ -127,12 +175,14 @@ function processData() {
 }
 
 function copyPlatformOutput() {
+    processData(); // Recalculate before copying
     const text = document.getElementById('platformOutput').value;
     if (!text) return;
     navigator.clipboard.writeText(text);
 }
 
 function copyToSheets() {
+    processData(); // Recalculate before copying
     const rows = Array.from(document.querySelectorAll('#resultBody tr'));
     if (rows.length === 0) return;
     const tsv = rows.map(row => {
