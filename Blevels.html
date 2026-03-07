@@ -249,6 +249,14 @@ function processData() {
             processedKeys = processedKeys.filter(k => k !== 'PDH' && k !== 'yNH');
             processedKeys.push('PDNH');
         }
+        if (keys.includes('WEH') && keys.includes('WRH')) {
+            processedKeys = processedKeys.filter(k => k !== 'WEH' && k !== 'WRH');
+            processedKeys.push('WERH');
+        }
+        if (keys.includes('WEL') && keys.includes('WRL')) {
+            processedKeys = processedKeys.filter(k => k !== 'WEL' && k !== 'WRL');
+            processedKeys.push('WERL');
+        }
 
         let hCount = processedKeys.filter(k => k.endsWith('H')).length;
         let lCount = processedKeys.filter(k => k.endsWith('L')).length;
